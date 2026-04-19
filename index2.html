@@ -1,0 +1,1563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Turing Machine Simulator for Language Recognition</title>
+<meta name="description" content="Simulation of formal languages using a Turing Machine framework. Includes DFA, PDA, and Turing Machine visualization."/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  /* Executive Slate & Steel */
+  --bg:          #0d1117;
+  --bg2:         #161b22;
+  --card:        rgba(20, 25, 35, 0.03);
+  --card2:       rgba(255, 255, 255, 0.01);
+  --surface:     rgba(30, 40, 60, 0.04);
+  --surface2:    rgba(20, 30, 50, 0.08);
+  --border:      rgba(255, 255, 255, 0.08); /* Crisp delicate 1px border */
+  --border-hi:   rgba(255, 255, 255, 0.12);
+  --border2:     rgba(255, 255, 255, 0.10);
+
+  --accent:      #64748b; /* Muted Steel Blue / Slate */
+  --accent2:     #64748b; 
+  --accent3:     #64748b;
+  
+  --text:        #cbd5e1;
+  --text2:       #94a3b8;
+  --muted:       #64748b;
+  --dim:         #475569;
+
+  --ok:          #10b981;
+  --ok-dim:      rgba(16, 185, 129, 0.06);
+  --ok-bd:       rgba(16, 185, 129, 0.2);
+  
+  --err:         #ef4444;
+  --err-dim:     rgba(239, 68, 68, 0.06);
+  --err-bd:      rgba(239, 68, 68, 0.2);
+
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Space Grotesk', sans-serif;
+  --r:    16px;
+  --rs:   10px;
+  --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  background: radial-gradient(circle at 50% 0%, var(--bg2), var(--bg) 85%);
+  color:var(--text);
+  font-family:var(--sans);
+  min-height:100vh;
+  padding-bottom:80px;
+  font-size:14px;
+  line-height:1.6;
+  overflow-x:hidden;
+}
+
+/* ── MOUSE-RESPONSIVE BG ─────────────────────────────────────── */
+#bg-canvas{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  pointer-events:all; /* Allows listening to clicks */
+  z-index:0;
+}
+header{position:relative;z-index:100;}
+main{position:relative;z-index:1;}
+
+/* ── HEADER ──────────────────────────────────────────────────── */
+header{
+  padding:20px 40px;
+  background: rgba(13, 17, 23, 0.5);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  display:flex;align-items:center;gap:18px;
+  position:sticky;top:0;
+  border-bottom: 1px solid var(--border);
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,0.02), 0 4px 16px rgba(0,0,0,0.4);
+}
+.logo{
+  width:42px;height:42px;
+  background: radial-gradient(circle at top left, rgba(100, 116, 139, 0.15), transparent);
+  border: 1px solid rgba(100, 116, 139, 0.3);
+  border-radius: 12px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:13px;font-weight:700;
+  color:var(--accent);flex-shrink:0;
+  box-shadow: 0 0 8px rgba(100, 116, 139, 0.1), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.header-title h1{
+  font-size:18px;font-weight:700;color:var(--text);
+  letter-spacing:-0.2px;line-height:1.2;
+}
+.header-title h1 span{color:#cbd5e1;}
+.header-sub{
+  font-size:10px;color:var(--muted);
+  font-family:var(--mono);letter-spacing:0.5px;margin-top:4px;
+}
+.hbadge{
+  margin-left:auto;
+  font-family:var(--mono);font-size:11px;font-weight:600;
+  color:#94a3b8;
+  border: 1px solid rgba(100, 116, 139, 0.3);
+  padding:6px 16px;border-radius:24px;
+  background: rgba(100, 116, 139, 0.08);
+  letter-spacing:0.5px;
+  box-shadow: 0 0 6px rgba(100, 116, 139, 0.08), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+/* ── LAYOUT ──────────────────────────────────────────────────── */
+main{max-width:1140px;margin:32px auto;padding:0 24px;display:flex;flex-direction:column;gap:24px;}
+.top-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;}
+
+/* Vertical stacking for simulation panels */
+.sim-panels{display:flex;flex-direction:column;gap:24px;}
+
+/* ── CARD (High Transparency Glassmorphism) ───────────────────── */
+.card{
+  background: var(--card);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 26px 28px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03);
+  transition: box-shadow var(--transition), border-color var(--transition), transform var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+/* Subtle sweeping light glow */
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 50%; height: 100%;
+  background: linear-gradient(to right, transparent, rgba(255,255,255,0.03), transparent);
+  transform: skewX(-20deg);
+  transition: var(--transition);
+  pointer-events: none;
+}
+.card:hover::before {
+  left: 200%;
+  transition: left 1s ease-in-out;
+}
+.card:hover{
+  box-shadow: 0 6px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(100, 116, 139, 0.15), inset 0 1px 0 rgba(255,255,255,0.05);
+  border-color: rgba(100, 116, 139, 0.3);
+}
+.ctitle{
+  font-size:10px;font-weight:700;letter-spacing:2px;
+  text-transform:uppercase;color:var(--text);
+  font-family:var(--mono);margin-bottom:20px;
+  display:flex;align-items:center;gap:10px;
+}
+.ctitle::before{
+  content:'';width:4px;height:14px;
+  background: linear-gradient(to bottom, var(--accent), var(--accent2));
+  border-radius:2px;flex-shrink:0;
+  box-shadow: 0 0 4px rgba(100, 116, 139, 0.2);
+}
+
+/* ── FORM ────────────────────────────────────────────────────── */
+.igrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.igroup{display:flex;flex-direction:column;gap:6px; position:relative;}
+.igroup label{
+  font-size:10px;font-weight:600;letter-spacing:1px;
+  color:var(--text2);text-transform:uppercase;font-family:var(--mono);
+}
+.igroup select,.igroup input{
+  background: rgba(255,255,255,0.02);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--rs);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 10px 14px;
+  outline: none;
+  transition: all var(--transition);
+  width:100%;-webkit-appearance:none;appearance:none;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+}
+.igroup select:focus,.igroup input:focus{
+  border-color: var(--accent);
+  background: rgba(100, 116, 139, 0.05);
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.1), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.igroup select option{background: #0d1117; color: var(--text);}
+.igroup input::placeholder{color:var(--dim);}
+.ifull{grid-column:1/-1;}
+
+/* ── BUTTONS ─────────────────────────────────────────────────── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  padding:10px 24px;border-radius: 30px; /* Pill-shaped */
+  font-family:var(--mono);font-size:12px;font-weight:700;
+  border:1px solid transparent;cursor:pointer;
+  transition:all var(--transition);
+  letter-spacing:0.5px;user-select:none;
+}
+.btn-p{
+  background: linear-gradient(135deg, rgba(100, 116, 139, 0.15), rgba(71, 85, 105, 0.15));
+  color:#cbd5e1;
+  border: 1px solid rgba(100, 116, 139, 0.4);
+  box-shadow: 0 2px 8px rgba(100, 116, 139, 0.1), inset 0 1px 0 rgba(255,255,255,0.05);
+  backdrop-filter: blur(12px);
+}
+.btn-p:hover{
+  background: linear-gradient(135deg, rgba(100, 116, 139, 0.25), rgba(71, 85, 105, 0.25));
+  box-shadow: 0 3px 12px rgba(100, 116, 139, 0.15), inset 0 1px 0 rgba(255,255,255,0.08);
+  transform: translateY(-2px);
+  border-color: #94a3b8;
+}
+.btn-s{
+  background: rgba(255,255,255,0.02);
+  color: var(--text2);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+}
+.btn-s:hover{
+  border-color: var(--text);
+  color: #fff;
+  background: rgba(255,255,255,0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(255,255,255,0.05);
+}
+.btn-g{
+  background: rgba(100, 116, 139, 0.1);
+  color: #94a3b8;
+  border: 1px solid rgba(100, 116, 139, 0.3);
+  backdrop-filter: blur(12px);
+}
+.btn-g:hover{
+  background: rgba(100, 116, 139, 0.18);
+  border-color: #94a3b8;
+  transform: translateY(-2px);
+  box-shadow: 0 3px 10px rgba(100, 116, 139, 0.12);
+}
+.btn:disabled{opacity:0.4;cursor:not-allowed;transform:none!important;box-shadow:none;}
+.runrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+
+/* ── MESSAGES ────────────────────────────────────────────────── */
+.msgbox{
+  padding:12px 16px;border-radius:var(--rs);
+  font-family:var(--mono);font-size:12px;line-height:1.5;
+  display:none;margin-top:16px;font-weight:600;
+  backdrop-filter: blur(12px);
+}
+.msgerr{background:var(--err-dim);border:1px solid var(--err-bd);color:var(--err); box-shadow: 0 0 6px var(--err-dim);}
+.msgok{background:var(--ok-dim);border:1px solid var(--ok-bd);color:var(--ok); box-shadow: 0 0 6px var(--ok-dim);}
+.msgbox.vis{display:block; animation: fadeIn 0.4s ease;}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── ANALYSIS ────────────────────────────────────────────────── */
+.agrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.aitem{
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  padding: 18px;
+  backdrop-filter: blur(12px);
+  transition: all var(--transition);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+}
+.aitem:hover{
+  border-color: rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.04);
+  transform: translateY(-1px);
+}
+.alabel{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-family:var(--mono);margin-bottom:6px;font-weight:600;}
+.aval{font-size:14px;font-weight:700;color:var(--text);font-family:var(--mono);line-height:1.3;}
+.asub{font-size:11px;color:var(--dim);margin-top:4px;font-family:var(--mono);line-height:1.5;}
+
+/* ── SIM SECTION ─────────────────────────────────────────────── */
+.sim-stack{display:flex;flex-direction:column;gap:24px;}
+.sinner{display:flex;flex-direction:column;gap:18px;}
+.slabel{
+  font-family:var(--mono);font-size:10px;font-weight:700;
+  color:#94a3b8;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;
+}
+
+/* ── DIAGRAM WRAP & THE "LIVING" SVG ENHANCEMENTS ────────────── */
+.diag-wrap{
+  background: rgba(0,0,0,0.15);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  padding: 12px;
+  overflow-x:auto;
+  min-height:220px;
+  display:flex;align-items:center;justify-content:center;
+  transition:border-color var(--transition);
+  box-shadow: inset 0 2px 10px rgba(0,0,0,0.3);
+}
+.diag-wrap:hover{border-color:rgba(255,255,255,0.15);}
+.diag-wrap svg{display:block;max-width:100%;height:auto;flex-shrink:0;overflow:visible;}
+
+/* LIVING SVG KEYFRAMES */
+@keyframes svgPulseGlow {
+  0% { filter: drop-shadow(0 0 2px #94a3b8); stroke: #94a3b8; stroke-width: 2px; }
+  100% { filter: drop-shadow(0 0 5px #94a3b8); stroke: #94a3b8; stroke-width: 3px; }
+}
+@keyframes edgeFlowDash {
+  from { stroke-dashoffset: 20; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* Specific Attribute Selectors to trap and animate elements set dynamically as 'active' inside JS */
+circle[stroke="#94a3b8"] {
+  animation: svgPulseGlow 1.2s infinite alternate ease-in-out;
+}
+path[stroke="#94a3b8"], line[stroke="#94a3b8"] {
+  stroke-dasharray: 6 4;
+  animation: edgeFlowDash 0.8s linear infinite, svgPulseGlow 1.2s infinite alternate ease-in-out;
+}
+
+/* ── STEP LOG ────────────────────────────────────────────────── */
+.steplog{
+  background: rgba(0,0,0,0.15);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  padding: 12px 14px;
+  max-height:160px;overflow-y:auto;
+  font-family:var(--mono);font-size:12px;color:var(--dim);
+  display:flex;flex-direction:column;gap:4px;line-height:1.6;
+  box-shadow: inset 0 2px 10px rgba(0,0,0,0.2);
+}
+.le{padding:4px 10px;border-radius:6px;border:1px solid transparent;transition:all var(--transition);}
+.le.act{
+  background: rgba(100, 116, 139, 0.1);
+  color: #cbd5e1;
+  border-color: rgba(100, 116, 139, 0.2);
+  font-weight:600;
+  box-shadow: 0 0 4px rgba(100, 116, 139, 0.08);
+}
+.le.acc{color:var(--ok);font-weight:700;}
+.le.rej{color:var(--err);font-weight:700;}
+
+/* ── STATE BADGE ─────────────────────────────────────────────── */
+.sbadge{
+  display:inline-flex;align-items:center;justify-content:center;
+  background: rgba(255,255,255,0.03);border:2px solid var(--border);
+  border-radius:50%;width:55px;height:55px;
+  font-family:var(--mono);font-size:13px;font-weight:700;
+  color:var(--text);transition:all var(--transition);flex-shrink:0;
+  backdrop-filter: blur(10px);
+}
+.sbadge.act-s{
+  background: rgba(100, 116, 139, 0.12);
+  border-color: #94a3b8;
+  color: #cbd5e1;
+  box-shadow: 0 0 8px rgba(100, 116, 139, 0.15);
+}
+.sbadge.acc-s{background:var(--ok-dim);border-color:var(--ok);color:var(--ok);box-shadow:0 0 8px rgba(16, 185, 129, 0.15);}
+.sbadge.rej-s{background:var(--err-dim);border-color:var(--err);color:var(--err);box-shadow:0 0 8px rgba(239, 68, 68, 0.15);}
+
+/* ── RESULT BADGE ────────────────────────────────────────────── */
+.rbadge{display:inline-flex;padding:6px 18px;border-radius:30px;font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:1px;}
+.racc{background:var(--ok-dim);border:1px solid var(--ok);color:var(--ok); box-shadow: 0 0 6px rgba(16, 185, 129, 0.1);}
+.rrej{background:var(--err-dim);border:1px solid var(--err);color:var(--err); box-shadow: 0 0 6px rgba(239, 68, 68, 0.1);}
+
+/* ── TAPE ────────────────────────────────────────────────────── */
+.tapedisplay{
+  display:flex;gap:6px;flex-wrap:wrap;align-items:center;
+  padding:12px 16px;background: rgba(0,0,0,0.15);
+  border: 1px solid var(--border);border-radius:var(--rs);min-height:60px;
+  box-shadow: inset 0 2px 10px rgba(0,0,0,0.2);
+}
+.tcell{
+  width:36px;height:36px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:14px;font-weight:700;
+  border-radius:8px;border: 1px solid var(--border);
+  background: rgba(255,255,255,0.03);color:var(--text2);
+  transition:all var(--transition);
+  backdrop-filter: blur(8px);
+}
+.tcell.cur{
+  background: var(--accent2);color:#cbd5e1;border-color:#94a3b8;
+  box-shadow:0 0 8px rgba(100, 116, 139, 0.2), inset 0 1px 0 rgba(255,255,255,0.1);
+  transform:scale(1.15) translateY(-2px);z-index:2;
+}
+.tcell.done{color:var(--dim);background:transparent;border-color:transparent;opacity:0.3;}
+
+/* ── STACK ───────────────────────────────────────────────────── */
+.sframe{
+  width:65px;height:35px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:13px;font-weight:700;
+  border: 1px solid var(--border);border-radius:8px;
+  background: rgba(255,255,255,0.03);color:var(--text2);
+  transition:all var(--transition);
+  backdrop-filter: blur(8px);
+}
+.sframe.top{
+  background: var(--accent2);border-color:#94a3b8;color:#cbd5e1;
+  box-shadow:0 0 6px rgba(100, 116, 139, 0.15), inset 0 1px 0 rgba(255,255,255,0.08);
+  transform: translateY(-2px);
+}
+.sframe.base{background:var(--ok-dim);border-color:var(--ok);color:var(--ok);}
+
+/* ── TM TAPE ─────────────────────────────────────────────────── */
+.tmtapewrap{overflow-x:auto;padding:6px 0;}
+.tmtape{display:flex;gap:6px;min-width:max-content;}
+.tmcell{
+  width:40px;height:40px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:15px;font-weight:800;
+  border: 1px solid var(--border);border-radius:8px;
+  background: rgba(255,255,255,0.03);color:var(--text2);
+  transition:all var(--transition);
+  backdrop-filter: blur(8px);
+}
+.tmcell.head{
+  background: var(--accent2);color:#cbd5e1;border-color:#94a3b8;
+  box-shadow:0 0 8px rgba(100, 116, 139, 0.2), inset 0 1px 0 rgba(255,255,255,0.1);
+  transform:scale(1.15) translateY(-2px);z-index:2;
+}
+.tmcell.blank{color:var(--dim);font-size:11px;opacity:0.6;}
+
+/* ── SIM INFO ────────────────────────────────────────────────── */
+.siminfo{
+  display:flex;gap:16px;flex-wrap:wrap;align-items:center;
+  padding:12px 16px;background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);border-radius:var(--rs);
+  font-family:var(--mono);font-size:12px;
+  backdrop-filter: blur(8px);
+}
+.sii{display:flex;gap:8px;align-items:center;color:var(--muted);}
+.sii span{
+  color:#fff;font-weight:700;
+  background: rgba(255,255,255,0.05);padding:4px 10px;
+  border-radius:6px;border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.tm-note{
+  font-family:var(--mono);font-size:11px;color:#94a3b8;
+  margin-bottom:12px;padding:12px 16px;
+  background: rgba(100, 116, 139, 0.08);border-radius:8px;
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  font-weight:600;
+  box-shadow: 0 0 4px rgba(100, 116, 139, 0.06);
+}
+.tm-explanation{
+  font-family:var(--sans);font-size:12px;color:var(--dim);
+  padding:12px 16px;background: rgba(255,255,255,0.02);
+  border-radius:var(--rs);border: 1px solid var(--border);
+  line-height:1.6;
+  border-left: 3px solid #475569;
+  margin-bottom:6px;
+}
+
+/* ── SECTION DIVIDER ─────────────────────────────────────────── */
+.section-divider{
+  display:flex;align-items:center;gap:14px;margin:8px 0;
+  color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:2px;
+}
+.section-divider::before,.section-divider::after{
+  content:'';flex:1;height:1px;
+  background:linear-gradient(to right,transparent,var(--border-hi),transparent);
+}
+
+/* ── CONTROLS ────────────────────────────────────────────────── */
+.ctrlrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;}
+.hidden{display:none!important;}
+
+/* ── SCROLLBAR ───────────────────────────────────────────────── */
+*::-webkit-scrollbar{width:6px;height:6px;}
+*::-webkit-scrollbar-track{background:transparent;}
+*::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:6px;}
+*::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.25);}
+
+/* ── RESPONSIVE ──────────────────────────────────────────────── */
+@media(max-width:900px){
+  .top-grid{grid-template-columns:1fr;}
+  .agrid{grid-template-columns:1fr 1fr;}
+  header{padding: 16px 20px;}
+  main{padding:0 16px;margin:20px auto;gap:20px;}
+  .card{padding:20px;}
+}
+@media(max-width:520px){
+  .agrid,.igrid{grid-template-columns:1fr;}
+}
+</style>
+
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<header>
+  <div class="logo">TM</div>
+  <div class="header-title">
+    <h1>Turing Machine Simulator <span>for Language Recognition</span></h1>
+    <div class="header-sub">Simulation of formal languages using a Turing Machine framework &nbsp;·&nbsp; Turing Machine Based Simulation</div>
+  </div>
+  <div class="hbadge">Σ = {a, b}</div>
+</header>
+
+<main>
+
+  <!-- ═══════════════════════════════════════════
+       AUTOMATA SIMULATION (via Turing Machine)
+  ═══════════════════════════════════════════ -->
+
+    <div class="bento-top">
+      <div class="card" id="inputCard">
+        <div class="ctitle">Input Configuration</div>
+        <div class="igrid">
+          <div class="igroup">
+            <label>Language Type</label>
+            <select id="langType">
+              <option value="regex">Regular Expression — DFA</option>
+              <option value="pattern">Context-Free Pattern — PDA</option>
+            </select>
+          </div>
+          <div class="igroup" id="regexInputGroup">
+            <label>Regular Expression (use | for union)</label>
+            <input type="text" id="langInput" placeholder="e.g. a*b+"/>
+          </div>
+          <div class="igroup hidden" id="patternRelationGroup">
+            <label>Context-Free Pattern</label>
+            <select id="patternRelation">
+              <option value="m_eq_kn">a&#x1D4F;&#x207F; b&#x02E1;&#x207F; &nbsp;(k·n a's, l·n b's)</option>
+              <option value="m_lt_n">a&#x207F; b&#x1D50; &nbsp;(m &lt; n)</option>
+              <option value="m_gt_n">a&#x207F; b&#x1D50; &nbsp;(m &gt; n)</option>
+            </select>
+          </div>
+          <div class="igroup hidden" id="kFactorGroup">
+            <label>Multiplier k (for a's)</label>
+            <input type="number" id="kFactor" value="1" min="1" max="4"/>
+          </div>
+          <div class="igroup hidden" id="lFactorGroup">
+            <label>Multiplier l (for b's)</label>
+            <input type="number" id="lFactor" value="1" min="1" max="4"/>
+          </div>
+          <div class="igroup ifull">
+            <label>Test String</label>
+            <input type="text" id="testString" placeholder="Enter a string over {a, b}"/>
+          </div>
+        </div>
+        <div class="runrow">
+          <button class="btn btn-p" onclick="runSimulation()">Run Simulation</button>
+          <button class="btn btn-s" onclick="clearAll()">Clear</button>
+        </div>
+        <div class="msgbox msgerr" id="errorBox"></div>
+        <div class="msgbox msgok"  id="successBox"></div>
+      </div>
+
+      <div class="card" id="analysisCard">
+        <div class="ctitle">Analysis</div>
+        <div class="agrid">
+          <div class="aitem">
+            <div class="alabel">Language Class</div>
+            <div class="aval" id="anaLang">—</div>
+            <div class="asub" id="anaLangSub">Awaiting simulation</div>
+          </div>
+          <div class="aitem">
+            <div class="alabel">Machine Selected</div>
+            <div class="aval" id="anaMachine">—</div>
+            <div class="asub" id="anaMachineSub">Run to see details</div>
+          </div>
+          <div class="aitem">
+            <div class="alabel">Test String</div>
+            <div class="aval" id="anaStr">—</div>
+            <div class="asub" id="anaStrSub">Length: 0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Simulation Panels: Vertical layout -->
+    <div class="sim-panels hidden" id="simSection">
+
+      <!-- Underlying Automaton (DFA/PDA) -->
+      <div class="card">
+        <div class="ctitle" id="primaryTitle">Underlying Automaton (DFA/PDA)</div>
+        <div class="sinner" id="primarySim"></div>
+        <div class="ctrlrow">
+          <button class="btn btn-g" id="p_next"  onclick="primaryNext()">Next Step</button>
+          <button class="btn btn-s" id="p_auto"  onclick="primaryAuto()">Auto Run</button>
+          <button class="btn btn-s" id="p_reset" onclick="primaryReset()">Reset</button>
+        </div>
+      </div>
+
+      <!-- Turing Machine (Decision Simulation) -->
+      <div class="card">
+        <div class="ctitle">Turing Machine (Decision Simulation)</div>
+        <div class="sinner" id="tmSim"></div>
+        <div class="ctrlrow">
+          <button class="btn btn-g" id="tm_next"  onclick="tmNext()">Next Step</button>
+          <button class="btn btn-s" id="tm_auto"  onclick="tmAuto()">Auto Run</button>
+          <button class="btn btn-s" id="tm_reset" onclick="tmReset()">Reset</button>
+        </div>
+        <div class="tm-explanation">
+          This Turing Machine represents the decision process of the underlying automaton.
+        </div>
+      </div>
+
+    </div>
+
+</main>
+
+<script>
+"use strict";
+
+// ================================================================
+// GLOBALS
+// ================================================================
+let MODE='regex',RELATION='m_eq_kn',MULTIPLIER=1,L_MULTIPLIER=1;
+let TEST_STR='',REGEX_STR='';
+let dfaSteps=[],dfaIdx=0,dfaAutoTimer=null;
+let pdaSteps=[],pdaIdx=0,pdaAutoTimer=null;
+let tmSteps=[],tmIdx=0,tmAutoTimer=null;
+let DFA_GRAPH=null,PDA_GRAPH=null;
+
+// ================================================================
+// VALIDATION
+// ================================================================
+function showError(m){const e=document.getElementById('errorBox'),s=document.getElementById('successBox');e.textContent=m;e.classList.add('vis');s.classList.remove('vis');}
+function showSuccess(m){const s=document.getElementById('successBox'),e=document.getElementById('errorBox');s.textContent=m;s.classList.add('vis');e.classList.remove('vis');}
+function clearMessages(){document.getElementById('errorBox').classList.remove('vis');document.getElementById('successBox').classList.remove('vis');}
+function validAlpha(s){return /^[ab]*$/.test(s);}
+function validRegex(r){try{new RegExp(r);return true;}catch(e){return false;}}
+
+// ================================================================
+// NODE LABEL HELPERS
+// ================================================================
+// svgNodeLabel: plain ASCII for SVG text nodes
+function svgNodeLabel(id){
+  if(id==='DEAD'||id==='dead') return 'qd';
+  const s=String(id);
+  if(s==='q_acc') return 'qa';
+  if(s==='q_rej') return 'qr';
+  if(s==='q_chk') return 'qc';
+  const m=s.match(/^q1_(\d+)$/);
+  if(m) return 'q1.'+m[1];
+  return s;
+}
+// nodeLabel: for badge display (same — avoid unicode subscripts that render inconsistently)
+function nodeLabel(id){ return svgNodeLabel(id); }
+
+// ================================================================
+// DFA / NFA CONSTRUCTION  (Thompson + Subset Construction)
+// ================================================================
+let _nfaId=0;
+function nfaState(accept=false){return{id:_nfaId++,tr:{a:[],b:[]},eps:[],accept};}
+
+function regexToNFA(regex){_nfaId=0;return parseAlt(tokenize(regex),{i:0});}
+
+function tokenize(s){
+  const out=[];
+  for(let i=0;i<s.length;i++){
+    const c=s[i];out.push(c);
+    if(i+1<s.length){
+      const n=s[i+1];
+      const isCharOrClose = /[ab)]/.test(c);
+      const isQuantifier = /[*+?]/.test(c);
+      const isCharOrOpen = /[ab(]/.test(n);
+      if ((isCharOrClose || isQuantifier) && isCharOrOpen) out.push('.');
+    }
+  }
+  return out;
+}
+
+function parseAlt(toks,pos){
+  let left=parseConcat(toks,pos);
+  while(pos.i<toks.length&&toks[pos.i]==='|'){
+    pos.i++;
+    const right=parseConcat(toks,pos);
+    const s=nfaState(),e=nfaState(true);
+    s.eps.push(left.start,right.start);
+    left.accept.accept=false;left.accept.eps.push(e);
+    right.accept.accept=false;right.accept.eps.push(e);
+    left={start:s,accept:e};
+  }
+  return left;
+}
+
+function parseConcat(toks,pos){
+  let left=parseStar(toks,pos);
+  while(pos.i<toks.length&&toks[pos.i]==='.'){
+    pos.i++;
+    const right=parseStar(toks,pos);
+    left.accept.accept=false;left.accept.eps.push(right.start);
+    left={start:left.start,accept:right.accept};
+  }
+  return left;
+}
+
+function parseStar(toks,pos){
+  let base=parseAtom(toks,pos);
+  if(pos.i<toks.length){
+    const op=toks[pos.i];
+    if(op==='*'||op==='+'||op==='?'){
+      pos.i++;
+      const s=nfaState(),e=nfaState(true);
+      s.eps.push(base.start);
+      base.accept.accept=false;base.accept.eps.push(e);
+      if(op==='*'||op==='+')base.accept.eps.push(base.start);
+      if(op==='*'||op==='?')s.eps.push(e);
+      base={start:s,accept:e};
+    }
+  }
+  return base;
+}
+
+function parseAtom(toks,pos){
+  if(pos.i>=toks.length)throw new Error('Unexpected end of regex');
+  const c=toks[pos.i++];
+  if(c==='('){const inner=parseAlt(toks,pos);if(pos.i>=toks.length||toks[pos.i]!==')')throw new Error('Missing )');pos.i++;return inner;}
+  if(c==='a'||c==='b'){const s=nfaState(),e=nfaState(true);s.tr[c].push(e);return{start:s,accept:e};}
+  throw new Error('Unexpected token: '+c);
+}
+
+function nfaToDFA(nfaStart){
+  function getAllNFAStates(start){
+    const visited=new Set(),all=[],q=[start];
+    while(q.length){const s=q.shift();if(visited.has(s.id))continue;visited.add(s.id);all.push(s);for(const c of['a','b'])for(const t of s.tr[c])q.push(t);for(const e of s.eps)q.push(e);}
+    return all;
+  }
+  const allNFA=getAllNFAStates(nfaStart);
+  function epsClose(states){
+    const visited=new Set(states.map(s=>s.id)),stack=[...states];
+    while(stack.length){const st=stack.pop();for(const e of st.eps){if(!visited.has(e.id)){visited.add(e.id);stack.push(e);}}}
+    return allNFA.filter(s=>visited.has(s.id));
+  }
+  const dfaStates=[],dfaMap=new Map(),wl=[];
+  function key(set){return set.map(s=>s.id).sort((a,b)=>a-b).join(',');}
+  function getOrCreate(set){
+    const k=key(set);if(dfaMap.has(k))return dfaMap.get(k);
+    const id=dfaStates.length,isAccept=set.some(s=>s.accept);
+    const ds={id,nfaSet:set,tr:{a:null,b:null},accept:isAccept};
+    dfaStates.push(ds);dfaMap.set(k,ds);wl.push(set);return ds;
+  }
+  getOrCreate(epsClose([nfaStart]));
+  while(wl.length){
+    const set=wl.shift(),ds=dfaMap.get(key(set));if(!ds)continue;
+    for(const c of['a','b']){
+      const next=[];for(const ns of set)for(const t of ns.tr[c])next.push(t);
+      const en=epsClose(next);
+      if(!en.length){
+        if(!dfaMap.has('DEAD')){const dead={id:'DEAD',tr:{a:null,b:null},accept:false,isDead:true};dead.tr.a=dead;dead.tr.b=dead;dfaStates.push(dead);dfaMap.set('DEAD',dead);}
+        ds.tr[c]=dfaMap.get('DEAD');
+      }else{ds.tr[c]=getOrCreate(en);}
+    }
+  }
+  return{states:dfaStates,start:dfaStates[0]};
+}
+
+function buildDFAGraph(regex){
+  const nfa=regexToNFA(regex),dfa=nfaToDFA(nfa.start);
+  const reachable=new Set([dfa.start.id]),q=[dfa.start];
+  while(q.length){const s=q.shift();for(const c of['a','b']){const t=s.tr[c];if(t&&!reachable.has(t.id)){reachable.add(t.id);q.push(t);}}}
+  return{states:dfa.states.filter(s=>reachable.has(s.id)),start:dfa.start};
+}
+
+function buildDFASteps(regex,input){
+  const graph=buildDFAGraph(regex);DFA_GRAPH=graph;
+  const steps=[];let cur=graph.start;
+  steps.push({state:cur.id,pos:-1,symbol:null,transition:'—',isAccept:false,isFinal:false});
+  for(let i=0;i<input.length;i++){
+    const c=input[i],next=cur.tr[c];
+    const trans='δ('+svgNodeLabel(cur.id)+', '+c+') → '+svgNodeLabel(next.id);
+    cur=next;const isFinal=i===input.length-1;
+    steps.push({state:cur.id,pos:i,symbol:c,transition:trans,isAccept:isFinal&&cur.accept,isFinal});
+  }
+  steps[steps.length-1].isAccept=cur.accept;steps[steps.length-1].isFinal=true;
+  return{steps,accepted:cur.accept,graph};
+}
+
+// ================================================================
+// PDA LOGIC
+// ================================================================
+function buildPDAGraph(relation,k,l){
+  let tr=[];
+  if(relation==='m_eq_kn'){
+    const pushA='a'.repeat(l);
+    const popB=k>1?'ε (×'+k+')':'ε';
+    tr=[{from:'q0',to:'q0',label:'a, Z → '+pushA+'Z\na, a → '+pushA+'a'},{from:'q0',to:'q1',label:'b, a → '+popB},{from:'q1',to:'q1',label:'b, a → '+popB},{from:'q1',to:'q2',label:'ε, Z → Z'}];
+  }
+  else if(relation==='m_lt_n'){tr=[{from:'q0',to:'q0',label:'a, Z → aZ\na, a → aa'},{from:'q0',to:'q1',label:'b, a → ε'},{from:'q1',to:'q1',label:'b, a → ε'},{from:'q0',to:'q2',label:'ε, a → a'},{from:'q1',to:'q2',label:'ε, a → a'}];}
+  else{tr=[{from:'q0',to:'q0',label:'a, Z → aZ\na, a → aa'},{from:'q0',to:'q1',label:'b, a → ε'},{from:'q1',to:'q1',label:'b, a → ε'},{from:'q1',to:'q2',label:'b, Z → Z'},{from:'q2',to:'q2',label:'b, Z → Z'}];}
+  return{states:[{id:'q0',accept:false},{id:'q1',accept:false},{id:'q2',accept:true}],transitions:tr,start:'q0'};
+}
+
+function buildPDASteps(input,relation,k,l){
+  PDA_GRAPH=buildPDAGraph(relation,k,l);
+  const steps=[];let state='q0',stack=['Z'];
+  const tape=input.split('');let pos=0,done=false,accepted=false;
+  steps.push({state:'q0',symbol:null,stackTop:'Z',stack:[...stack],action:'INIT',transition:'—',pos:0,tape,desc:'Initial configuration, stack = [Z]'});
+  while(pos<=tape.length&&!done){
+    const sym=pos<tape.length?tape[pos]:null;
+    const stackTop=stack[stack.length-1];
+    if(state==='q0'){
+      if(sym==='a'){
+        const pc=relation==='m_eq_kn'?l:1;const ps='a'.repeat(pc);
+        const tr='δ(q0, a, '+stackTop+') → (q0, '+ps+stackTop+')';
+        for(let i=0;i<pc;i++)stack.push('a');pos++;
+        steps.push({state:'q0',symbol:'a',stackTop,stack:[...stack],action:'PUSH '+ps,transition:tr,pos,tape,desc:"Read 'a', PUSH '"+ps+"'"});
+      }else if(sym==='b'){
+        const popCount=relation==='m_eq_kn'?k:1;
+        let canPop=true;
+        for(let pi=0;pi<popCount;pi++){if(stack[stack.length-1-pi]!=='a'){canPop=false;break;}}
+        if(canPop&&stack.length>popCount){
+          for(let pi=0;pi<popCount;pi++)stack.pop();
+          pos++;state='q1';
+          const actLabel = popCount > 1 ? 'POP a×'+popCount : 'POP a';
+          const transLabel = popCount > 1 ? 'δ(q0, b, a) → (q1, ε) [×'+popCount+']' : 'δ(q0, b, a) → (q1, ε)';
+          const descLabel = popCount > 1 ? "Read 'b', POP "+popCount+" a('s), move to q1" : "Read 'b', POP 'a', move to q1";
+          steps.push({state:'q1',symbol:'b',stackTop:'a',stack:[...stack],action:actLabel,transition:transLabel,pos,tape,desc:descLabel});
+        }else{
+          steps.push({state:'q0',symbol:'b',stackTop,stack:[...stack],action:'REJECT',transition:'No transition',pos,tape,desc:'Not enough a on stack — REJECT'});done=true;
+        }
+      }else{
+        if(relation==='m_lt_n'&&stackTop==='a'){state='q2';steps.push({state:'q2',symbol:'ε',stackTop:'a',stack:[...stack],action:'ACCEPT',transition:'δ(q0, ε, a) → (q2, a)',pos,tape,desc:'Input ended, a on stack (m=0 < n) — ACCEPT'});done=true;accepted=true;}
+        else{steps.push({state:'q0',symbol:'ε',stackTop,stack:[...stack],action:'REJECT',transition:'No end transition',pos,tape,desc:'Input ended in q0 — REJECT'});done=true;}
+      }
+    }else if(state==='q1'){
+      if(sym==='b'&&stackTop==='a'){
+        const popCount=relation==='m_eq_kn'?k:1;
+        let canPop=true;
+        for(let pi=0;pi<popCount;pi++){if(stack[stack.length-1-pi]!=='a'){canPop=false;break;}}
+        if(canPop&&stack.length>popCount){
+          for(let pi=0;pi<popCount;pi++)stack.pop();
+          pos++;
+          const actLabel = popCount > 1 ? 'POP a×'+popCount : 'POP a';
+          const transLabel = popCount > 1 ? 'δ(q1, b, a) → (q1, ε) [×'+popCount+']' : 'δ(q1, b, a) → (q1, ε)';
+          const descLabel = popCount > 1 ? "Read 'b', POP "+popCount+" a('s)" : "Read 'b', POP 'a'";
+          steps.push({state:'q1',symbol:'b',stackTop:'a',stack:[...stack],action:actLabel,transition:transLabel,pos,tape,desc:descLabel});
+        }else{
+          steps.push({state:'q1',symbol:'b',stackTop,stack:[...stack],action:'REJECT',transition:'No transition',pos,tape,desc:'Not enough a on stack — REJECT'});done=true;
+        }
+      }
+      else if(sym==='b'&&stackTop==='Z'&&relation==='m_gt_n'){pos++;state='q2';steps.push({state:'q2',symbol:'b',stackTop:'Z',stack:[...stack],action:'READ b',transition:'δ(q1, b, Z) → (q2, Z)',pos,tape,desc:"Extra 'b' found, move to q2"});}
+      else if(sym===null){
+        if(relation==='m_eq_kn'&&stackTop==='Z'){state='q2';steps.push({state:'q2',symbol:'ε',stackTop:'Z',stack:[...stack],action:'ACCEPT',transition:'δ(q1, ε, Z) → (q2, Z)',pos,tape,desc:'Input consumed, stack at Z — ACCEPT'});done=true;accepted=true;}
+        else if(relation==='m_lt_n'&&stackTop==='a'){state='q2';steps.push({state:'q2',symbol:'ε',stackTop:'a',stack:[...stack],action:'ACCEPT',transition:'δ(q1, ε, a) → (q2, a)',pos,tape,desc:'Input ended, a on stack (m < n) — ACCEPT'});done=true;accepted=true;}
+        else{steps.push({state:'q1',symbol:'ε',stackTop,stack:[...stack],action:'REJECT',transition:'Stack/input mismatch',pos,tape,desc:'Mismatch at end — REJECT'});done=true;}
+      }else if(sym==='a'){steps.push({state:'q1',symbol:'a',stackTop,stack:[...stack],action:'REJECT',transition:'No transition: a after b',pos,tape,desc:"'a' in b-section — REJECT"});done=true;}
+      else{steps.push({state:'q1',symbol:sym,stackTop,stack:[...stack],action:'REJECT',transition:'Unexpected',pos,tape,desc:'Unexpected — REJECT'});done=true;}
+    }else if(state==='q2'){
+      if(sym==='b'&&stackTop==='Z'&&relation==='m_gt_n'){
+        pos++;
+        steps.push({state:'q2',symbol:'b',stackTop:'Z',stack:[...stack],action:'READ b',transition:'δ(q2, b, Z) → (q2, Z)',pos,tape,desc:"Extra 'b' found, consume"});
+      }else if(sym===null){
+        steps.push({state:'q2',symbol:'ε',stackTop:'Z',stack:[...stack],action:'ACCEPT',transition:'δ(q2, ε, Z) → (q2, Z)',pos,tape,desc:'Input consumed, stack at Z — ACCEPT'});
+        done=true;accepted=true;
+      }else{
+        steps.push({state:'q2',symbol:sym,stackTop,stack:[...stack],action:'REJECT',transition:'Unexpected',pos,tape,desc:'Unexpected — REJECT'});done=true;
+      }
+    }
+  }
+  return{steps,accepted};
+}
+
+// ================================================================
+// TURING MACHINE LOGIC
+// ================================================================
+function buildTMSteps(input,mode,relation,k,l){return mode==='regex'?buildTMRegex(input):buildTMPattern(input,relation,k,l);}
+
+function buildTMRegex(input){
+  const steps=[],tape=['_',...input.split(''),'_'];
+  let head=1,cur=DFA_GRAPH.start;
+  steps.push({tape:[...tape],head,state:cur.id,action:'INIT',desc:'Tape loaded. TM simulates DFA transitions.',movement:'S'});
+  while(head<tape.length){
+    const sym=tape[head];
+    if (sym === '_') {
+      const isAcc=cur.accept&&!cur.isDead;
+      steps.push({tape:[...tape],head,state:cur.id,action:isAcc?'ACCEPT':'REJECT',desc:(isAcc?svgNodeLabel(cur.id)+' is accept — ACCEPT':svgNodeLabel(cur.id)+' is reject — REJECT'),movement:'S'});
+      break;
+    }
+    const next=cur.tr[sym];
+    if(!next||next.isDead){
+      steps.push({tape:[...tape],head,state:'DEAD',action:'REJECT',desc:"No transition for '"+sym+"' — REJECT",movement:'S'});
+      cur={id:'DEAD',accept:false,isDead:true};
+      break;
+    }
+    steps.push({tape:[...tape],head,state:next.id,action:'READ '+sym,desc:'δ('+svgNodeLabel(cur.id)+', '+sym+') → '+svgNodeLabel(next.id)+', move R',movement:'R'});
+    cur=next;head++;
+  }
+  const isAcc=cur.accept&&!cur.isDead;
+  return{steps,accepted:isAcc};
+}
+
+function buildTMPattern(input,relation,k,l){
+  const steps=[],BLANK='_';
+  let tape=[BLANK,...input.split(''),BLANK,BLANK];
+  let head=1,state='q0',accepted=false;
+  const desc0=relation==='m_eq_kn'?`Mark ${k} a's→X, find ${l} b's→Y.`:relation==='m_lt_n'?"Mark a→X, b→Y. Accept when b's run out.":"Mark a→X, b→Y. Accept if extra b's remain.";
+  steps.push({tape:[...tape],head,state,action:'INIT',desc:'Tape loaded. '+desc0,movement:'S'});
+  const MAX=400;let iter=0;
+  while(state!=='q_acc'&&state!=='q_rej'&&iter<MAX){
+    iter++;const sym=tape[head]||BLANK;
+    if(relation==='m_eq_kn'){
+      if(state.startsWith('q0')){
+        const ca=state==='q0'?1:parseInt(state.split('_')[1]||1);
+        if(sym==='a'){
+          tape[head]='X';
+          const ns=ca<k?'q0_'+(ca+1):'q1_1';
+          steps.push({tape:[...tape],head,state:ns,action:'WRITE X',desc:'Mark a→X (#'+ca+'/'+k+')',movement:'R'});
+          state=ns;head++;
+        }
+        else if(sym==='Y'){steps.push({tape:[...tape],head,state,action:'SKIP Y',desc:'Skip Y',movement:'R'});head++;}
+        else if(sym===BLANK||sym==='X'){
+             if(ca===1){steps.push({tape:[...tape],head,state:'q_acc',action:'ACCEPT',desc:'All matched — ACCEPT',movement:'S'});state='q_acc';accepted=true;}
+             else{steps.push({tape:[...tape],head,state:'q_rej',action:'REJECT',desc:'Not enough a\'s for group — REJECT',movement:'S'});state='q_rej';}
+        }
+        else{steps.push({tape:[...tape],head,state:'q_rej',action:'REJECT',desc:"Unexpected '"+sym+"' — REJECT",movement:'S'});state='q_rej';}
+      }else if(state.startsWith('q1_')){
+        const cb=parseInt(state.split('_')[1]);
+        if(sym==='a'||sym==='Y'){steps.push({tape:[...tape],head,state,action:'SKIP '+sym,desc:'Scan for b #'+cb+'/'+l,movement:'R'});head++;}
+        else if(sym==='b'){
+          tape[head]='Y';
+          const ns=cb<l?'q1_'+(cb+1):'q2';
+          const mv=cb<l?'R':'L';
+          steps.push({tape:[...tape],head,state:ns,action:'WRITE Y',desc:'Mark b→Y (#'+cb+''+(cb<l?', scan R':', scan L')+')',movement:mv});
+          state=ns;head+=(cb<l?1:-1);
+        }
+        else{steps.push({tape:[...tape],head,state:'q_rej',action:'REJECT',desc:'Missing b#'+cb+' — REJECT',movement:'S'});state='q_rej';}
+      }else if(state==='q2'){
+        if(sym==='Y'||sym==='a'||sym==='b'){steps.push({tape:[...tape],head,state:'q2',action:'SCAN L',desc:'Scan left past '+sym,movement:'L'});head--;}
+        else if(sym==='X'||sym===BLANK){steps.push({tape:[...tape],head,state:'q0',action:'RESET',desc:'Return to scan next a',movement:'R'});state='q0';head++;}
+      }
+    }else if(relation==='m_lt_n'){
+      if(state==='q0'){
+        if(sym==='a'){tape[head]='X';steps.push({tape:[...tape],head,state:'q1',action:'WRITE X',desc:"Mark a→X",movement:'R'});state='q1';head++;}
+        else if(sym==='Y'){steps.push({tape:[...tape],head,state:'q0',action:'SKIP Y',desc:'Skip Y',movement:'R'});head++;}
+        else if(sym===BLANK){steps.push({tape:[...tape],head,state:'q_rej',action:'REJECT',desc:'No a to match — REJECT',movement:'S'});state='q_rej';}
+        else{steps.push({tape:[...tape],head,state:'q_rej',action:'REJECT',desc:"Bad symbol — REJECT",movement:'S'});state='q_rej';}
+      }else if(state==='q1'){
+        if(sym==='a'||sym==='Y'){steps.push({tape:[...tape],head,state:'q1',action:'SKIP '+sym,desc:'Scan R for b',movement:'R'});head++;}
+        else if(sym==='b'){tape[head]='Y';steps.push({tape:[...tape],head,state:'q2',action:'WRITE Y',desc:"Mark b→Y, scan L",movement:'L'});state='q2';head--;}
+        else if(sym===BLANK){steps.push({tape:[...tape],head,state:'q_acc',action:'ACCEPT',desc:"b's exhausted before a's — ACCEPT",movement:'S'});state='q_acc';accepted=true;}
+        else{steps.push({tape:[...tape],head,state:'q_rej',action:'REJECT',desc:'Error',movement:'S'});state='q_rej';}
+      }else if(state==='q2'){
+        if(sym==='Y'||sym==='a'){steps.push({tape:[...tape],head,state:'q2',action:'SCAN L',desc:'Scan L',movement:'L'});head--;}
+        else if(sym==='X'){steps.push({tape:[...tape],head,state:'q0',action:'RESET',desc:'Return',movement:'R'});state='q0';head++;}
+      }
+    }else{
+      if(state==='q0'){
+        if(sym==='a'){tape[head]='X';steps.push({tape:[...tape],head,state:'q1',action:'WRITE X',desc:"Mark a→X",movement:'R'});state='q1';head++;}
+        else if(sym==='Y'){steps.push({tape:[...tape],head,state:'q0',action:'SKIP Y',desc:'Skip Y',movement:'R'});head++;}
+        else if(sym==='b'){steps.push({tape:[...tape],head,state:'q_acc',action:'ACCEPT',desc:'Unmatched b — ACCEPT',movement:'S'});state='q_acc';accepted=true;}
+        else{steps.push({tape:[...tape],head,state:'q_rej',action:'REJECT',desc:"Bad symbol — REJECT",movement:'S'});state='q_rej';}
+      }else if(state==='q1'){
+        if(sym==='a'||sym==='Y'){steps.push({tape:[...tape],head,state:'q1',action:'SKIP '+sym,desc:'Scan R',movement:'R'});head++;}
+        else if(sym==='b'){tape[head]='Y';steps.push({tape:[...tape],head,state:'q2',action:'WRITE Y',desc:"Mark b→Y, scan L",movement:'L'});state='q2';head--;}
+        else if(sym===BLANK){steps.push({tape:[...tape],head,state:'q_rej',action:'REJECT',desc:'No b for this a — REJECT',movement:'S'});state='q_rej';}
+      }else if(state==='q2'){
+        if(sym==='Y'||sym==='a'){steps.push({tape:[...tape],head,state:'q2',action:'SCAN L',desc:'Scan L',movement:'L'});head--;}
+        else if(sym==='X'){steps.push({tape:[...tape],head,state:'q0',action:'RESET',desc:'Return',movement:'R'});state='q0';head++;}
+      }
+    }
+  }
+  if(state!=='q_acc'&&state!=='q_rej'){steps.push({tape:[...tape],head,state:'q_rej',action:'REJECT',desc:'Timeout — REJECT',movement:'S'});accepted=false;}
+  return{steps,accepted};
+}
+
+// ================================================================
+// SVG COLORS — light theme
+// ================================================================
+const SC={
+  edge:'#334155',      edgeAct:'#94a3b8',
+  nodeFill:'#111827',  nodeStroke:'#334155', nodeText:'#64748b',
+  actFill:'rgba(100,116,139,0.12)',  actStroke:'#94a3b8',  actText:'#cbd5e1',
+  accFill:'rgba(16,185,129,0.08)', accStroke:'#10b981',  accText:'#10b981',
+  rejFill:'rgba(239,68,68,0.08)',rejStroke:'#ef4444',  rejText:'#ef4444',
+  deadFill:'#0f172a',  deadStroke:'#1e293b',  deadText:'#475569',
+  pill:'rgba(13,17,23,0.88)',
+};
+
+function mkDefs(nm,na){
+  return `<defs>
+    <marker id="${nm}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="${SC.edge}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="${na}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="${SC.edgeAct}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>`;
+}
+
+function radPt(cx,cy,r,tx,ty){const dx=tx-cx,dy=ty-cy,d=Math.sqrt(dx*dx+dy*dy)||1;return{x:cx+dx/d*r,y:cy+dy/d*r};}
+
+function drawEdge(parts,fp,tp,R,label,col,mk,isSelf,isBelow){
+  const lns=label.split('\n');
+  if(isSelf){
+    const lx=fp.x,ly=fp.y-R;
+    parts.push(`<path d="M${lx-10} ${ly-2} C${lx-28} ${ly-50} ${lx+28} ${ly-50} ${lx+10} ${ly-2}" fill="none" stroke="${col}" stroke-width="1.5" marker-end="${mk}"/>`);
+    const sy=ly-50-(lns.length*7);
+    lns.forEach((ln,i)=>parts.push(`<text x="${lx}" y="${sy+i*15}" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11.5" font-weight="600" fill="${col}">${ln}</text>`));
+  }else if(isBelow){
+    const mx=(fp.x+tp.x)/2,dist=Math.abs(tp.x-fp.x);
+    const drop=dist>400?88:dist>200?65:46;
+    const my=fp.y+drop+18;
+    const p1=radPt(fp.x,fp.y,R,mx,my),p2=radPt(tp.x,tp.y,R,mx,my);
+    parts.push(`<path d="M${p1.x} ${p1.y} Q${mx} ${my} ${p2.x} ${p2.y}" fill="none" stroke="${col}" stroke-width="1.5" marker-end="${mk}"/>`);
+    const sy=my-5-(lns.length>1?7:0);
+    lns.forEach((ln,i)=>parts.push(`<text x="${mx}" y="${sy+i*15}" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11.5" font-weight="600" fill="${col}">${ln}</text>`));
+  }else{
+    const p1=radPt(fp.x,fp.y,R,tp.x,tp.y),p2=radPt(tp.x,tp.y,R,fp.x,fp.y);
+    parts.push(`<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${col}" stroke-width="1.5" marker-end="${mk}"/>`);
+    const mx=(p1.x+p2.x)/2,my=(p1.y+p2.y)/2-15;
+    const sy=lns.length>1?my-7:my;
+    lns.forEach((ln,i)=>parts.push(`<text x="${mx}" y="${sy+i*15}" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11.5" font-weight="600" fill="${col}">${ln}</text>`));
+  }
+}
+
+function drawNode(parts,p,R,fill,stroke,textFill,label,sw,isAccept){
+  parts.push(`<circle cx="${p.x}" cy="${p.y}" r="${R}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`);
+  if(isAccept)parts.push(`<circle cx="${p.x}" cy="${p.y}" r="${R-6}" fill="none" stroke="${stroke}" stroke-width="1.5"/>`);
+  parts.push(`<text x="${p.x}" y="${p.y}" text-anchor="middle" dominant-baseline="central" font-family="JetBrains Mono,monospace" font-size="12" font-weight="600" fill="${textFill}">${label}</text>`);
+}
+
+// ================================================================
+// DFA SVG
+// ================================================================
+function buildDFASVG(graph,currState,prevState,isFinal,showTMLabels){
+  const states=graph.states,N=states.length;
+  if(!N)return'<svg width="100%" viewBox="0 0 300 80"></svg>';
+  const R=26,PAD=70;
+  const colW=Math.max(130,Math.min(160,600/N));
+  const COLS=Math.min(N,Math.ceil(560/colW));
+  const ROWS=Math.ceil(N/COLS);
+  // Use negative Y origin to prevent self-loop label clipping at top
+  const TOP_PAD=80;
+  const nodeY=TOP_PAD+R+30;
+  const W=COLS*colW+PAD*2,H=ROWS*110+TOP_PAD+120;
+  const pos={};
+  states.forEach((st,i)=>{
+    const row=Math.floor(i/COLS),col=i%COLS;
+    const rc=(row===ROWS-1)?N-row*COLS:COLS;
+    const totalRowW=rc*colW;
+    const rs=(W-totalRowW)/2;
+    pos[st.id]={x:rs+col*colW+colW/2,y:nodeY+row*110};
+  });
+  const edgeMap={};
+  for(const st of states)for(const c of['a','b']){
+    const t=st.tr[c];if(!t)continue;
+    const k=st.id+'->'+t.id;
+    if(!edgeMap[k])edgeMap[k]={from:st.id,to:t.id,labels:[]};
+    edgeMap[k].labels.push(c);
+  }
+  const parts=[`<svg width="100%" viewBox="0 0 ${W} ${H}" style="min-width:${Math.min(W,340)}px">`];
+  parts.push(mkDefs('da','daa'));
+  const sp=pos[graph.start.id];
+  parts.push(`<line x1="${sp.x-R-24}" y1="${sp.y}" x2="${sp.x-R-2}" y2="${sp.y}" stroke="${SC.edge}" stroke-width="1.8" marker-end="url(#da)"/>`);
+  for(const k of Object.keys(edgeMap)){
+    const e=edgeMap[k],fp=pos[e.from],tp=pos[e.to];if(!fp||!tp)continue;
+    // Standardized label format: DFA → "a, b"; TM → "a → a, R"
+    const label=showTMLabels?e.labels.map(l=>l+' → '+l+', R').join('\n'):e.labels.join(', ');
+    const isAct=prevState?(e.from===prevState&&e.to===currState):false;
+    const col=isAct?SC.edgeAct:SC.edge,mk=isAct?'url(#daa)':'url(#da)';
+    const revKey=e.to+'->'+e.from,hasBi=!!edgeMap[revKey],isSelf=e.from===e.to;
+    const dx=tp.x-(fp.x||0),dy=tp.y-(fp.y||0),dist=Math.sqrt(dx*dx+dy*dy);
+    const isLong=!isSelf&&!hasBi&&Math.abs(dx)>colW*1.4;
+    if(isSelf){drawEdge(parts,fp,fp,R,label,col,mk,true,false);}
+    else if(hasBi||isLong){
+      const nx=-dy/dist,ny=dx/dist,curve=hasBi?34:55;
+      const mx=(fp.x+tp.x)/2+nx*curve,my=(fp.y+tp.y)/2+ny*curve;
+      const p1=radPt(fp.x,fp.y,R,mx,my),p2=radPt(tp.x,tp.y,R,mx,my);
+      parts.push(`<path d="M${p1.x} ${p1.y} Q${mx} ${my} ${p2.x} ${p2.y}" fill="none" stroke="${col}" stroke-width="1.5" marker-end="${mk}"/>`);
+      const lx=mx+nx*18,ly=my+ny*18;
+      const lns=label.split('\n'),sy=lns.length>1?ly-7:ly;
+      lns.forEach((ln,i)=>parts.push(`<text x="${lx}" y="${sy+i*15}" text-anchor="middle" dominant-baseline="central" font-family="JetBrains Mono,monospace" font-size="11.5" font-weight="600" fill="${col}">${ln}</text>`));
+    }else{drawEdge(parts,fp,tp,R,label,col,mk,false,false);}
+  }
+  for(const st of states){
+    const p=pos[st.id],isAct=(st.id===currState);
+    let fill,stroke,textFill,sw=1.5;
+    if(isAct&&isFinal){fill=st.accept?SC.accFill:SC.rejFill;stroke=st.accept?SC.accStroke:SC.rejStroke;textFill=st.accept?SC.accText:SC.rejText;sw=2.5;}
+    else if(isAct){fill=SC.actFill;stroke=SC.actStroke;textFill=SC.actText;sw=2.5;}
+    else if(st.isDead){fill=SC.deadFill;stroke=SC.deadStroke;textFill=SC.deadText;}
+    else{fill=SC.nodeFill;stroke=SC.nodeStroke;textFill=SC.nodeText;}
+    drawNode(parts,p,R,fill,stroke,textFill,svgNodeLabel(st.id),sw,st.accept);
+  }
+  parts.push('</svg>');return parts.join('\n');
+}
+
+// ================================================================
+// PDA SVG
+// ================================================================
+function buildPDASVG(currState,prevState){
+  const graph=PDA_GRAPH;if(!graph)return'';
+  const W=560,H=280,R=26;
+  // Centered positions with top padding for self-loop labels
+  const positions={q0:{x:140,y:155},q1:{x:280,y:155},q2:{x:420,y:155}};
+  const parts=[`<svg width="100%" viewBox="0 0 ${W} ${H}" style="min-width:340px">`];
+  parts.push(mkDefs('pa','paa'));
+  parts.push(`<line x1="65" y1="155" x2="110" y2="155" stroke="${SC.edge}" stroke-width="1.8" marker-end="url(#pa)"/>`);
+  for(const e of graph.transitions){
+    const fp=positions[e.from],tp=positions[e.to];if(!fp||!tp)continue;
+    const isAct=prevState?(e.from===prevState&&e.to===currState):false;
+    const col=isAct?SC.edgeAct:SC.edge,mk=isAct?'url(#paa)':'url(#pa)';
+    drawEdge(parts,fp,tp,R,e.label,col,mk,e.from===e.to,(e.from==='q0'&&e.to==='q2'));
+  }
+  for(const st of graph.states){
+    const p=positions[st.id],isAct=(st.id===currState);
+    drawNode(parts,p,R,isAct?SC.actFill:SC.nodeFill,isAct?SC.actStroke:SC.nodeStroke,isAct?SC.actText:SC.nodeText,st.id,isAct?2.5:1.5,st.accept);
+  }
+  parts.push('</svg>');return parts.join('\n');
+}
+
+// ================================================================
+// TM SVG
+// ================================================================
+function buildTMSVG(mode,currState,prevState,relation,k,l){
+  let states=[],edges=[];
+  if(mode==='regex'){
+    states=[{id:'q0'},{id:'q_acc',accept:true},{id:'q_rej',isRej:true}];
+    edges=[{from:'q0',to:'q_acc',label:'accept'},{from:'q0',to:'q_rej',label:'reject'}];
+  }else if(relation==='m_eq_kn'){
+    states.push({id:'q0'});
+    for(let i=2;i<=k;i++) states.push({id:`q0_${i}`});
+    for(let j=1;j<=l;j++) states.push({id:`q1_${j}`});
+    states.push({id:'q2'},{id:'q_acc',accept:true},{id:'q_rej',isRej:true});
+    
+    edges.push({from:'q0',to:'q0',label:'Y → Y, R',self:true});
+    edges.push({from:'q0',to:'q_acc',label:'B → B, S',below:true});
+    
+    let lastA = 'q0';
+    for(let i=2;i<=k;i++) {
+      edges.push({from:lastA, to:`q0_${i}`, label:'a → X, R'});
+      lastA = `q0_${i}`;
+    }
+    
+    edges.push({from:lastA, to:'q1_1', label:'a → X, R'});
+    
+    for(let j=1;j<=l;j++) {
+      edges.push({from:`q1_${j}`, to:`q1_${j}`, label:'a/Y → R', self:true});
+      if(j<l) {
+        edges.push({from:`q1_${j}`, to:`q1_${j+1}`, label:'b → Y, R'});
+      } else {
+        edges.push({from:`q1_${l}`, to:'q2', label:'b → Y, L'});
+      }
+    }
+    edges.push({from:'q2',to:'q2',label:'a/b/Y → L',self:true});
+    edges.push({from:'q2',to:'q0',label:'X → X, R',below:true});
+
+  }else if(relation==='m_lt_n'){
+    states=[{id:'q0'},{id:'q1'},{id:'q2'},{id:'q_acc',accept:true},{id:'q_rej',isRej:true}];
+    edges=[{from:'q0',to:'q1',label:'a → X, R'},{from:'q0',to:'q0',label:'Y → Y, R',self:true},{from:'q1',to:'q1',label:'a/Y → R',self:true},{from:'q1',to:'q2',label:'b → Y, L'},{from:'q1',to:'q_acc',label:'B → B, S',below:true},{from:'q2',to:'q2',label:'a/Y → L',self:true},{from:'q2',to:'q0',label:'X → X, R',below:true}];
+  }else{
+    states=[{id:'q0'},{id:'q1'},{id:'q2'},{id:'q_acc',accept:true},{id:'q_rej',isRej:true}];
+    edges=[{from:'q0',to:'q1',label:'a → X, R'},{from:'q0',to:'q0',label:'Y → Y, R',self:true},{from:'q0',to:'q_acc',label:'b → b, S',below:true},{from:'q1',to:'q1',label:'a/Y → R',self:true},{from:'q1',to:'q2',label:'b → Y, L'},{from:'q2',to:'q2',label:'a/Y → L',self:true},{from:'q2',to:'q0',label:'X → X, R',below:true}];
+  }
+  
+  const R=26,colW=142;
+  // MATHEMATICAL FIX: Dynamically calculate total width based on number of states
+  const totalNodesW=states.length*colW;
+  const W=Math.max(560,totalNodesW + (colW * 0.5)); // Ensure it fits the container
+  const H=310;
+  
+  // Center the graph based on the dynamic width
+  const startX= (W - (states.length - 1) * colW) / 2;
+  const positions={};
+  states.forEach((s,i)=>{positions[s.id]={x:startX+i*colW,y:140};});
+  
+  const parts=[`<svg width="100%" viewBox="0 0 ${W} ${H}" style="min-width:${Math.min(W,360)}px">`];
+  parts.push(mkDefs('ta','taa'));
+  const sp=positions['q0'];
+  parts.push(`<line x1="${sp.x-R-24}" y1="${sp.y}" x2="${sp.x-R-2}" y2="${sp.y}" stroke="${SC.edge}" stroke-width="1.8" marker-end="url(#ta)"/>`);
+  for(const e of edges){
+    const fp=positions[e.from],tp=positions[e.to];if(!fp||!tp)continue;
+    const isAct=prevState?(e.from===prevState&&e.to===currState):false;
+    const col=isAct?SC.edgeAct:SC.edge,mk=isAct?'url(#taa)':'url(#ta)';
+    drawEdge(parts,fp,tp,R,e.label,col,mk,!!e.self,!!e.below);
+  }
+  for(const st of states){
+    const p=positions[st.id],isAct=(st.id===currState);
+    let fill,stroke,textFill,sw=1.5;
+    if(isAct&&st.accept){fill=SC.accFill;stroke=SC.accStroke;textFill=SC.accText;sw=2.5;}
+    else if(isAct&&st.isRej){fill=SC.rejFill;stroke=SC.rejStroke;textFill=SC.rejText;sw=2.5;}
+    else if(isAct){fill=SC.actFill;stroke=SC.actStroke;textFill=SC.actText;sw=2.5;}
+    else if(st.accept){stroke='rgba(21,128,61,0.4)';textFill='rgba(21,128,61,0.7)';fill=SC.nodeFill;}
+    else if(st.isRej){stroke='rgba(185,28,28,0.4)';textFill='rgba(185,28,28,0.7)';fill=SC.nodeFill;}
+    else{fill=SC.nodeFill;stroke=SC.nodeStroke;textFill=SC.nodeText;}
+    
+    let label = st.id;
+    if (label.startsWith('q0_') && label !== 'q0') label = `qa.${label.split('_')[1]}`;
+    if (label.startsWith('q1_') && label !== 'q1') label = `qb.${label.split('_')[1]}`;
+    if (label === 'q2' && relation === 'm_eq_kn') label = `q.ret`;
+    
+    drawNode(parts,p,R,fill,stroke,textFill,svgNodeLabel(label),sw,st.accept);
+  }
+  parts.push('</svg>');return parts.join('\n');
+}
+
+// ================================================================
+// STEP LOG FORMATTERS
+// ================================================================
+function fmtDFA(i,s){const sym=s.symbol?"'"+s.symbol+"'":'—';return'Step '+i+': '+svgNodeLabel(s.state)+' | sym='+sym+' | '+s.transition;}
+function fmtPDA(i,s){const sym=s.symbol?"'"+s.symbol+"'":'init';return'Step '+i+': '+s.state+' | sym='+sym+' | '+s.action;}
+function fmtTM(i,s){return'Step '+i+': '+svgNodeLabel(s.state)+' | '+s.action+' | move='+(s.movement||'S');}
+
+// ================================================================
+// MAIN RUNNER
+// ================================================================
+function runSimulation(){
+  clearMessages();
+  MODE=document.getElementById('langType').value;
+  RELATION=document.getElementById('patternRelation').value;
+  MULTIPLIER=Math.max(1,Math.min(4,parseInt(document.getElementById('kFactor').value)||1));
+  L_MULTIPLIER=Math.max(1,Math.min(4,parseInt(document.getElementById('lFactor').value)||1));
+  const langInput=document.getElementById('langInput').value.trim();
+  const testStr=document.getElementById('testString').value.trim();
+  if(testStr===''){showError('Test string is required.');return;}
+  if(!validAlpha(testStr)){showError('Only {a, b} are allowed in the test string.');return;}
+  TEST_STR=testStr;
+  if(MODE==='regex'){
+    if(!langInput){showError('Regular expression is required.');return;}
+    REGEX_STR=langInput;
+    if(!validRegex(REGEX_STR)){showError('Invalid regex. Use a, b, *, |, +, ?, (, ).');return;}
+    let dfaResult;
+    try{dfaResult=buildDFASteps(REGEX_STR,TEST_STR);}
+    catch(e){showError('Regex parse error: '+e.message);return;}
+    dfaSteps=dfaResult.steps;
+    tmSteps=buildTMSteps(TEST_STR,'regex',null,null).steps;
+    showSuccess('DFA + TM ready. Use the controls to step through.');
+    setupAnalysis('Regular Language','DFA (Deterministic Finite Automaton)','Regex → regular language → DFA + TM selected',testStr);
+    setupDFAPanel();setupTMPanel();
+  }else{
+    const pr=buildPDASteps(testStr,RELATION,MULTIPLIER,L_MULTIPLIER);
+    pdaSteps=pr.steps;
+    tmSteps=buildTMSteps(testStr,'pattern',RELATION,MULTIPLIER,L_MULTIPLIER).steps;
+    showSuccess('PDA + TM ready. Use the controls to step through.');
+    let pl='a'+MULTIPLIER+'ⁿ b'+L_MULTIPLIER+'ⁿ (k='+MULTIPLIER+', l='+L_MULTIPLIER+')';
+    if(RELATION==='m_lt_n')pl='aⁿ bᵐ (m<n)';
+    if(RELATION==='m_gt_n')pl='aⁿ bᵐ (m>n)';
+    setupAnalysis('Context-Free Language','PDA (Pushdown Automaton)',pl+' is CFL → PDA + TM selected',testStr);
+    setupPDAPanel();setupTMPanel();
+  }
+  document.getElementById('simSection').classList.remove('hidden');
+  dfaIdx=0;pdaIdx=0;tmIdx=0;
+}
+
+function clearAll(){
+  clearMessages();
+  document.getElementById('langInput').value='';
+  document.getElementById('testString').value='';
+  document.getElementById('simSection').classList.add('hidden');
+  stopAllTimers();
+}
+function stopAllTimers(){
+  if(dfaAutoTimer){clearInterval(dfaAutoTimer);dfaAutoTimer=null;}
+  if(pdaAutoTimer){clearInterval(pdaAutoTimer);pdaAutoTimer=null;}
+  if(tmAutoTimer){clearInterval(tmAutoTimer);tmAutoTimer=null;}
+}
+function setupAnalysis(lang,machine,explanation,str){
+  document.getElementById('anaLang').textContent=lang;
+  document.getElementById('anaLangSub').textContent=explanation;
+  document.getElementById('anaMachine').textContent=machine.split('(')[0].trim();
+  document.getElementById('anaMachineSub').textContent=machine.includes('(')?'('+machine.split('(')[1]:'';
+  document.getElementById('anaStr').textContent='"'+str+'"';
+  document.getElementById('anaStrSub').textContent='Length: '+str.length;
+}
+
+// ── DFA PANEL ─────────────────────────────────────────────────
+function setupDFAPanel(){dfaIdx=0;document.getElementById('primaryTitle').textContent='Underlying Automaton (DFA)';renderDFA(0);}
+function renderDFA(idx){
+  const steps=dfaSteps;if(!steps.length)return;
+  const step=steps[idx],isLast=(idx===steps.length-1);
+  // Calculate prevState SAFELY
+  const prevState = idx>0?steps[idx-1].state:null;
+  const tape=TEST_STR.split('');let html='';
+  html+='<div class="slabel">State Diagram</div>';
+  html+='<div class="diag-wrap">'+buildDFASVG(DFA_GRAPH,step.state,prevState,isLast,false)+'</div>';
+  const sc=isLast?(step.isAccept?'acc-s':'rej-s'):'act-s';
+  html+='<div style="display:flex;align-items:center;gap:11px;margin-top:8px">';
+  html+='<div class="sbadge '+sc+'">'+nodeLabel(step.state)+'</div>';
+  if(isLast)html+='<span class="rbadge r'+(step.isAccept?'acc':'rej')+'">'+(step.isAccept?'ACCEPT':'REJECT')+'</span>';
+  html+='</div>';
+  html+='<div class="slabel" style="margin-top:10px">Input Tape</div>';
+  html+='<div class="tapedisplay">';
+  tape.forEach((ch,i)=>{let cls='tcell';if(i<step.pos)cls+=' done';if(i===step.pos)cls+=' cur';html+='<div class="'+cls+'">'+ch+'</div>';});
+  if(!tape.length)html+='<span style="color:var(--muted);font-family:var(--mono);font-size:12px">empty</span>';
+  html+='</div>';
+  html+='<div class="siminfo" style="margin-top:8px"><div class="sii">Symbol: <span>'+(step.symbol||'—')+'</span></div><div class="sii">Transition: <span>'+step.transition+'</span></div></div>';
+  html+='<div class="slabel" style="margin-top:10px">Step Log</div><div class="steplog" id="dfa-log">';
+  for(let i=Math.max(0,idx-8);i<=idx;i++){const s=steps[i];let cls='le';if(i===idx)cls+=' act';if(i===steps.length-1&&s.isAccept)cls+=' acc';if(i===steps.length-1&&!s.isAccept)cls+=' rej';html+='<div class="'+cls+'">'+fmtDFA(i,s)+'</div>';}
+  html+='</div>';
+  html+='<div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:5px">Step '+idx+' / '+(steps.length-1)+'</div>';
+  document.getElementById('primarySim').innerHTML=html;
+  const log=document.getElementById('dfa-log');if(log)log.scrollTop=log.scrollHeight;
+  document.getElementById('p_next').disabled=isLast;
+}
+
+// ── PDA PANEL ─────────────────────────────────────────────────
+function setupPDAPanel(){pdaIdx=0;document.getElementById('primaryTitle').textContent='Underlying Automaton (PDA)';renderPDA(0);}
+function renderPDA(idx){
+  const steps=pdaSteps;if(!steps.length)return;
+  const step=steps[idx],isLast=(idx===steps.length-1);
+  // Calculate prevState SAFELY
+  const prevState = idx > 0 ? steps[idx - 1].state : null;
+  const tape=step.tape;let html='';
+  html+='<div class="slabel">State Diagram</div>';
+  html+='<div class="diag-wrap">'+buildPDASVG(step.state,prevState)+'</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px">';
+  html+='<div>';
+  const sc=isLast?(step.action==='ACCEPT'?'acc-s':'rej-s'):'act-s';
+  html+='<div class="slabel">Current State</div>';
+  html+='<div style="display:flex;align-items:center;gap:9px;margin-bottom:11px">';
+  html+='<div class="sbadge '+sc+'">'+step.state+'</div>';
+  if(isLast)html+='<span class="rbadge r'+(step.action==='ACCEPT'?'acc':'rej')+'">'+step.action+'</span>';
+  html+='</div>';
+  html+='<div class="slabel">Input Tape</div>';
+  html+='<div class="tapedisplay" style="margin-bottom:9px">';
+  tape.forEach((ch,i)=>{let cls='tcell';if(i<step.pos)cls+=' done';if(i===step.pos)cls+=' cur';html+='<div class="'+cls+'">'+ch+'</div>';});
+  html+='</div>';
+  html+='<div class="slabel">Transition</div>';
+  html+='<div class="siminfo"><div style="font-family:var(--mono);font-size:11.5px;font-weight:600;color:var(--text2)">'+step.transition+'</div></div>';
+  html+='<div style="margin-top:5px;font-family:var(--mono);font-size:11px;color:var(--dim)">'+step.desc+'</div>';
+  html+='</div>';
+  html+='<div><div class="slabel">Stack (top first)</div>';
+  html+='<div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);min-height:120px;margin-top:3px">';
+  const sd=[...step.stack].reverse();
+  sd.forEach((f,i)=>{let cls='sframe';if(i===0)cls+=' top';if(f==='Z')cls+=' base';html+='<div class="'+cls+'">'+f+'</div>';});
+  if(!sd.length)html+='<div class="sframe" style="color:var(--err)">empty</div>';
+  html+='</div></div></div>';
+  html+='<div class="slabel" style="margin-top:12px">Step Log</div>';
+  html+='<div class="steplog" id="pda-log">';
+  for(let i=Math.max(0,idx-6);i<=idx;i++){const s=steps[i];let cls='le';if(i===idx)cls+=' act';if(s.action==='ACCEPT')cls+=' acc';if(s.action==='REJECT')cls+=' rej';html+='<div class="'+cls+'">'+fmtPDA(i,s)+'</div>';}
+  html+='</div>';
+  html+='<div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:5px">Step '+idx+' / '+(steps.length-1)+'</div>';
+  document.getElementById('primarySim').innerHTML=html;
+  const log=document.getElementById('pda-log');if(log)log.scrollTop=log.scrollHeight;
+  document.getElementById('p_next').disabled=isLast;
+}
+
+function primaryNext(){if(MODE==='regex'){if(dfaIdx<dfaSteps.length-1){dfaIdx++;renderDFA(dfaIdx);}}else{if(pdaIdx<pdaSteps.length-1){pdaIdx++;renderPDA(pdaIdx);}}}
+function primaryAuto(){
+  const isRegex = (MODE==='regex');
+  if(isRegex){
+    if(dfaAutoTimer){clearInterval(dfaAutoTimer);dfaAutoTimer=null;document.getElementById('p_auto').textContent='Auto Run';return;}
+    document.getElementById('p_auto').textContent='Stop';
+    dfaAutoTimer=setInterval(()=>{
+      if(dfaIdx>=dfaSteps.length-1){clearInterval(dfaAutoTimer);dfaAutoTimer=null;document.getElementById('p_auto').textContent='Auto Run';return;}
+      primaryNext();
+    },600);
+  } else {
+    if(pdaAutoTimer){clearInterval(pdaAutoTimer);pdaAutoTimer=null;document.getElementById('p_auto').textContent='Auto Run';return;}
+    document.getElementById('p_auto').textContent='Stop';
+    pdaAutoTimer=setInterval(()=>{
+      if(pdaIdx>=pdaSteps.length-1){clearInterval(pdaAutoTimer);pdaAutoTimer=null;document.getElementById('p_auto').textContent='Auto Run';return;}
+      primaryNext();
+    },600);
+  }
+}
+function primaryReset(){if(dfaAutoTimer){clearInterval(dfaAutoTimer);dfaAutoTimer=null;}if(pdaAutoTimer){clearInterval(pdaAutoTimer);pdaAutoTimer=null;}document.getElementById('p_auto').textContent='Auto Run';dfaIdx=0;pdaIdx=0;if(MODE==='regex')renderDFA(0);else renderPDA(0);}
+
+// ── TM PANEL ──────────────────────────────────────────────────
+function setupTMPanel(){tmIdx=0;renderTM(0);}
+function renderTM(idx){
+  const steps=tmSteps;if(!steps.length)return;
+  const step=steps[idx],isLast=(idx===steps.length-1);
+  // Calculate prevState SAFELY
+  const prevState = idx > 0 ? steps[idx - 1].state : null;
+  let html='';
+  html+='<div class="slabel">State Diagram</div>';
+  if(MODE==='regex'){
+    html+='<div class="tm-note">This TM simulates the DFA: reads tape L→R following the same δ transitions.</div>';
+    html+='<div class="diag-wrap">'+buildDFASVG(DFA_GRAPH,step.state,prevState,isLast&&step.action==='ACCEPT',true)+'</div>';
+  }else{
+    html+='<div class="diag-wrap">'+buildTMSVG(MODE,step.state,prevState,RELATION,MULTIPLIER,L_MULTIPLIER)+'</div>';
+  }
+  const sc=isLast?(step.action==='ACCEPT'?'acc-s':'rej-s'):'act-s';
+  html+='<div style="display:flex;align-items:center;gap:11px;margin-top:8px">';
+  html+='<div class="sbadge '+sc+'">'+nodeLabel(step.state)+'</div>';
+  if(isLast)html+='<span class="rbadge r'+(step.action==='ACCEPT'?'acc':'rej')+'">'+step.action+'</span>';
+  html+='</div>';
+  html+='<div class="slabel" style="margin-top:10px">Tape</div>';
+  html+='<div class="tmtapewrap"><div class="tmtape">';
+  step.tape.forEach((ch,i)=>{let cls='tmcell';if(ch==='_')cls+=' blank';if(i===step.head)cls+=' head';html+='<div class="'+cls+'">'+(ch==='_'?'B':ch)+'</div>';});
+  html+='</div></div>';
+  html+='<div class="siminfo" style="margin-top:8px"><div class="sii">Action: <span>'+step.action+'</span></div><div class="sii">Move: <span>'+(step.movement||'S')+'</span></div></div>';
+  html+='<div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:4px">'+step.desc+'</div>';
+  html+='<div class="slabel" style="margin-top:12px">Step Log</div>';
+  html+='<div class="steplog" id="tm-log">';
+  for(let i=Math.max(0,idx-6);i<=idx;i++){const s=steps[i];let cls='le';if(i===idx)cls+=' act';if(s.action==='ACCEPT')cls+=' acc';if(s.action==='REJECT')cls+=' rej';html+='<div class="'+cls+'">'+fmtTM(i,s)+'</div>';}
+  html+='</div>';
+  html+='<div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:5px">Step '+idx+' / '+(steps.length-1)+'</div>';
+  document.getElementById('tmSim').innerHTML=html;
+  const log=document.getElementById('tm-log');if(log)log.scrollTop=log.scrollHeight;
+  document.getElementById('tm_next').disabled=isLast;
+}
+function tmNext(){if(tmIdx<tmSteps.length-1){tmIdx++;renderTM(tmIdx);}}
+function tmAuto(){if(tmAutoTimer){clearInterval(tmAutoTimer);tmAutoTimer=null;document.getElementById('tm_auto').textContent='Auto Run';return;}document.getElementById('tm_auto').textContent='Stop';tmAutoTimer=setInterval(()=>{if(tmIdx>=tmSteps.length-1){clearInterval(tmAutoTimer);tmAutoTimer=null;document.getElementById('tm_auto').textContent='Auto Run';return;}tmNext();},600);}
+function tmReset(){if(tmAutoTimer){clearInterval(tmAutoTimer);tmAutoTimer=null;}document.getElementById('tm_auto').textContent='Auto Run';tmIdx=0;renderTM(0);}
+
+// ================================================================
+// UI INIT
+// ================================================================
+function syncLangTypeUI(){
+  const isP=document.getElementById('langType').value==='pattern';
+  const isEq=document.getElementById('patternRelation').value==='m_eq_kn';
+  document.getElementById('regexInputGroup').classList.toggle('hidden',isP);
+  document.getElementById('patternRelationGroup').classList.toggle('hidden',!isP);
+  document.getElementById('kFactorGroup').classList.toggle('hidden',!isP||!isEq);
+  document.getElementById('lFactorGroup').classList.toggle('hidden',!isP||!isEq);
+  if(isP)document.getElementById('langInput').value='';
+}
+
+document.getElementById('langType').addEventListener('change',syncLangTypeUI);
+document.getElementById('patternRelation').addEventListener('change',function(){
+  const isEq=this.value==='m_eq_kn';
+  document.getElementById('kFactorGroup').classList.toggle('hidden',!isEq);
+  document.getElementById('lFactorGroup').classList.toggle('hidden',!isEq);
+});
+document.getElementById('testString').addEventListener('keydown',function(e){if(e.key==='Enter')runSimulation();});
+
+syncLangTypeUI();
+// ================================================================
+// MOUSE-RESPONSIVE BACKGROUND GRADIENT — vibrant dark theme
+// ================================================================
+(function(){
+  const canvas=document.getElementById('bg-canvas');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  let W,H;
+  let mx=-1000,my=-1000;
+  let shockwaves = [];
+
+  let nodes = [];
+  const NUM_NODES = 85; 
+  const CONN_DIST = 160;
+  
+  function resize(){
+    W=canvas.width=window.innerWidth;
+    H=canvas.height=window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+  
+  document.addEventListener('mousemove', e=>{
+    mx = e.clientX;
+    my = e.clientY;
+  });
+
+  // Shockwave click event
+  document.addEventListener('mousedown', e => {
+    shockwaves.push({ x: e.clientX, y: e.clientY, radius: 0, force: 1.0 });
+  });
+
+  for(let i=0; i<NUM_NODES; i++){
+    nodes.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      vx: (Math.random() - 0.5) * 1.0,
+      vy: (Math.random() - 0.5) * 1.0,
+      baseR: Math.random() * 2 + 1.5,
+      angle: Math.random() * Math.PI * 2,
+      pulseSpeed: Math.random() * 0.04 + 0.02,
+      colorPhase: Math.random() * Math.PI * 2
+    });
+  }
+
+  function draw(){
+    // Soft clear for motion tracing
+    ctx.fillStyle='rgba(13, 17, 23, 0.45)';
+    ctx.fillRect(0,0,W,H);
+
+    // Update Shockwaves
+    for (let s=shockwaves.length-1; s>=0; s--){
+        let sw = shockwaves[s];
+        sw.radius += 12;
+        sw.force -= 0.02;
+        if (sw.force <= 0) { shockwaves.splice(s, 1); }
+        // Radial ring draw
+        else {
+            ctx.beginPath();
+            ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI*2);
+            ctx.strokeStyle = `rgba(100, 116, 139, ${sw.force * 0.25})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+    }
+
+    // Update nodes
+    for(let i=0; i<NUM_NODES; i++){
+      let n = nodes[i];
+      n.x += n.vx;
+      n.y += n.vy;
+      n.angle += n.pulseSpeed;
+      n.colorPhase += 0.005;
+      
+      if(n.x < 0) { n.x = 0; n.vx *= -1; }
+      if(n.x > W) { n.x = W; n.vx *= -1; }
+      if(n.y < 0) { n.y = 0; n.vy *= -1; }
+      if(n.y > H) { n.y = H; n.vy *= -1; }
+      
+      // Shockwave physical push on nodes
+      for (let sw of shockwaves) {
+          let dx = n.x - sw.x;
+          let dy = n.y - sw.y;
+          let dist = Math.sqrt(dx*dx + dy*dy);
+          // If node is near expanding shockwave boundary
+          if (Math.abs(dist - sw.radius) < 40) {
+              let push = (40 - Math.abs(dist - sw.radius)) * 0.05 * sw.force;
+              n.x += (dx / dist) * push;
+              n.y += (dy / dist) * push;
+          }
+      }
+
+      // Mouse interaction -> Magnetic Repulsion (Push)
+      let dx = mx - n.x;
+      let dy = my - n.y;
+      let dist = Math.sqrt(dx*dx + dy*dy);
+      if(dist < 200){
+        let force = (200 - dist) / 200;
+        n.x -= dx * force * 0.015;  // Pushes away from cursor
+        n.y -= dy * force * 0.015;
+      }
+
+      // Dynamic Node Pulsing
+      let currentR = n.baseR + Math.sin(n.angle) * 1.2;
+      if (currentR < 0.5) currentR = 0.5;
+      
+      // Colors: Executive Slate
+      let r = 100;
+      let g = 116;
+      let b = 139;
+      let alpha = 0.15 + Math.sin(n.colorPhase) * 0.12; // Subtle opacity
+
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, currentR, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      
+      ctx.shadowBlur = 4;
+      ctx.shadowColor = `rgba(${r}, ${g}, ${b}, 0.3)`;
+      ctx.fill();
+      ctx.shadowBlur = 0; // Performance reset
+
+      for(let j=i+1; j<NUM_NODES; j++){
+        let n2 = nodes[j];
+        let d = Math.sqrt((n.x-n2.x)*(n.x-n2.x) + (n.y-n2.y)*(n.y-n2.y));
+        if(d < CONN_DIST){
+          ctx.beginPath();
+          ctx.moveTo(n.x, n.y);
+          ctx.lineTo(n2.x, n2.y);
+          // Fading connections — extremely faint
+          ctx.strokeStyle = `rgba(100, 116, 139, ${Math.pow(1 - d/CONN_DIST, 2) * 0.15})`;
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+        }
+      }
+      
+      // Repulsion lines to cursor radius — faint
+      if(dist < CONN_DIST){
+          ctx.beginPath();
+          ctx.moveTo(n.x, n.y);
+          ctx.lineTo(mx, my);
+          ctx.strokeStyle = `rgba(100, 116, 139, ${ Math.pow(1 - dist/CONN_DIST, 2) * 0.15 })`;
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+</script>
+</body>
+</html>
